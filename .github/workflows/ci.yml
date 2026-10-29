@@ -47,7 +47,7 @@ jobs:
 
   test-debian:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -66,8 +66,6 @@ jobs:
           name: kuma-heartbeat-deb-debian-${{ matrix.arch }}
           path: dist
 
-      - uses: docker/setup-qemu-action@v4
-
       - name: Install, smoke-test, and uninstall inside ${{ matrix.image }}
         run: |
           version_number="${VERSION#v}"
@@ -78,7 +76,7 @@ jobs:
 
   test-termux:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,8 +88,6 @@ jobs:
         with:
           name: kuma-heartbeat-deb-termux-${{ matrix.arch }}
           path: dist
-
-      - uses: docker/setup-qemu-action@v4
 
       - name: Install, smoke-test, and uninstall inside termux-docker
         run: |

@@ -147,7 +147,7 @@ a version with a new revision.
 
 | Environment | Where |
 | --- | --- |
-| Debian 12/13, Ubuntu 24.04, arm64 and amd64 (emulated) | locally and in CI |
+| Debian 12/13, Ubuntu 24.04, arm64 and amd64 | locally (amd64 emulated) and in CI (native runners) |
 | Ubuntu 22.04/26.04 | CI only |
 | Termux (`termux-docker`) aarch64 and x86_64, including a real runit service | locally and in CI |
 | Real systemd: timer firing, `DynamicUser`/`LoadCredential` | **not tested** (containers run without systemd as PID 1); units are checked with `systemd-analyze verify` only |
