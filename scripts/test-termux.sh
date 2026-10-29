@@ -37,6 +37,7 @@ arch="$(dpkg --print-architecture)"
 paths="$(dpkg-deb -c "$deb_path" | awk '{print $6}' | grep -v '^\./$')"
 bad="$(echo "$paths" | grep -vE '^\./data/data/com\.termux/files/usr(/|$)|^\./data(/|/data|/data/com\.termux|/data/com\.termux/files)/?$' || true)"
 [[ -z "$bad" ]] || fail "paths outside the Termux prefix: $bad"
+echo "$paths" | grep -q '/down$' && fail "package must not ship the service down file"
 echo "$paths" | grep -qiE 'systemd|^\./(usr|etc|lib)/' && fail "systemd or non-Termux paths in package"
 
 echo "==> Installing dependencies and $deb_path"
@@ -52,7 +53,7 @@ version_out="$(kuma-heartbeat --version)"
 [[ "$version_out" == "kuma-heartbeat ${expected_version}-"* ]] || fail "--version printed '$version_out'"
 [[ "$(stat -c %a "$conf")" == 600 ]] || fail "$conf mode is not 600"
 [[ -x "$svc/run" && -x "$svc/log/run" ]] || fail "service scripts missing"
-[[ -e "$svc/down" ]] || fail "service should ship disabled (down file)"
+[[ -e "$svc/down" ]] || fail "postinst should create the down file on a fresh install"
 dpkg -s kuma-heartbeat | grep -q "^Status: install ok installed" || fail "dpkg status not installed"
 
 echo "==> Functional test against a stub Uptime Kuma"
@@ -79,6 +80,16 @@ sv status kuma-heartbeat | grep -q '^run:' || { sv status kuma-heartbeat || true
 sleep 13
 [[ "$(wc -l < "$reqlog")" -ge 1 ]] || fail "service sent no heartbeat within 13 s"
 grep -q "ping=" "$reqlog" || echo "(note: no ping value seen yet)"
+
+echo "==> Upgrading while enabled (stays enabled, service restarted)"
+old_pid="$(sv status kuma-heartbeat | sed -n 's/^run: [^:]*: (pid \([0-9]*\)).*/\1/p')"
+apt-get install -y --reinstall "./${deb_path}" >/dev/null || fail "apt-get reinstall"
+sleep 3
+[[ ! -e "$svc/down" ]] || fail "upgrade re-created the down file"
+sv status kuma-heartbeat | grep -q '^run:' || { sv status kuma-heartbeat || true; fail "service not running after upgrade"; }
+new_pid="$(sv status kuma-heartbeat | sed -n 's/^run: [^:]*: (pid \([0-9]*\)).*/\1/p')"
+[[ -n "$old_pid" && "$old_pid" != "$new_pid" ]] || fail "service not restarted by upgrade ($old_pid -> $new_pid)"
+
 sv-disable kuma-heartbeat >/dev/null 2>&1 || true
 kill "$runsvdir_pid" 2>/dev/null || true
 kill "$stub_pid" 2>/dev/null || true

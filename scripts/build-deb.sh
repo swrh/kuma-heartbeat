@@ -113,10 +113,8 @@ else
   cp "$repo_root/debian/termux-service-run" "$svc/run"
   cp "$repo_root/debian/termux-service-log-run" "$svc/log/run"
   chmod 755 "$svc/run" "$svc/log/run"
-  # termux-services convention: "down" keeps the service stopped until the
-  # user runs sv-enable (which removes it).
-  : > "$svc/down"
-  chmod 644 "$svc/down"
+  # The "down" file is not shipped: termux-postinst creates it on a fresh
+  # install only, so upgrades never change whether the service is enabled.
 fi
 
 changelog="$work_dir/changelog.Debian"

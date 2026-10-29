@@ -1,8 +1,18 @@
 #!/data/data/com.termux/files/usr/bin/sh
 set -e
 
-if [ "$1" = configure ] && [ -z "$2" ]; then
-  echo "kuma-heartbeat: edit \$PREFIX/etc/kuma-heartbeat/kuma-heartbeat.conf, then run: sv-enable kuma-heartbeat" >&2
+svc=/data/data/com.termux/files/usr/var/service/kuma-heartbeat
+
+if [ "$1" = configure ]; then
+  if [ -z "$2" ]; then
+    # termux-services convention: "down" keeps the service stopped until the
+    # user runs sv-enable (which removes it).
+    : >"$svc/down"
+    echo "kuma-heartbeat: edit \$PREFIX/etc/kuma-heartbeat/kuma-heartbeat.conf, then run: sv-enable kuma-heartbeat" >&2
+  elif command -v sv >/dev/null 2>&1 && sv status "$svc" 2>/dev/null | grep -q '^run:'; then
+    # Upgrade: the running loop still has the old script in memory.
+    sv restart "$svc" >/dev/null 2>&1 || true
+  fi
 fi
 
 exit 0
