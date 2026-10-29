@@ -1,0 +1,5 @@
+dist/
+*.deb
+work/
+pkgroot/
+.DS_Store

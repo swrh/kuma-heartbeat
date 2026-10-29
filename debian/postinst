@@ -1,0 +1,41 @@
+#!/bin/sh
+set -e
+
+conf=/etc/kuma-heartbeat/kuma-heartbeat.conf
+
+# True when the config has a non-empty host and token.
+configured() {
+  /usr/bin/kuma-heartbeat --check-config --config "$conf" >/dev/null 2>&1
+}
+
+if [ "$1" = configure ] || [ "$1" = abort-upgrade ] || [ "$1" = abort-deconfigure ] || [ "$1" = abort-remove ]; then
+  if command -v deb-systemd-helper >/dev/null 2>&1; then
+    deb-systemd-helper unmask kuma-heartbeat.timer >/dev/null || true
+    # Fresh install: enable only once the config is filled in. Upgrade:
+    # keep whatever the admin chose.
+    enable=0
+    if [ -z "$2" ]; then
+      if configured; then enable=1; fi
+    elif deb-systemd-helper --quiet was-enabled kuma-heartbeat.timer; then
+      enable=1
+    fi
+    if [ "$enable" = 1 ]; then
+      deb-systemd-helper enable kuma-heartbeat.timer >/dev/null || true
+    else
+      deb-systemd-helper update-state kuma-heartbeat.timer >/dev/null || true
+    fi
+  fi
+
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    if [ "${enable:-0}" = 1 ] && command -v deb-systemd-invoke >/dev/null 2>&1; then
+      deb-systemd-invoke restart kuma-heartbeat.timer >/dev/null || true
+    fi
+  fi
+
+  if [ -z "$2" ] && ! configured; then
+    echo "kuma-heartbeat: edit $conf, then run: systemctl enable --now kuma-heartbeat.timer" >&2
+  fi
+fi
+
+exit 0

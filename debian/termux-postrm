@@ -1,0 +1,14 @@
+#!/data/data/com.termux/files/usr/bin/sh
+set -e
+
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+  # runsv leaves its supervise/ state behind, which would keep dpkg from
+  # removing the service directory.
+  rm -rf /data/data/com.termux/files/usr/var/service/kuma-heartbeat
+fi
+if [ "$1" = purge ]; then
+  rm -rf /data/data/com.termux/files/usr/var/log/sv/kuma-heartbeat \
+    /data/data/com.termux/files/usr/etc/kuma-heartbeat
+fi
+
+exit 0

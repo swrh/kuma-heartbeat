@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/sh
+set -e
+
+if [ "$1" = remove ] && command -v sv-disable >/dev/null 2>&1; then
+  sv-disable kuma-heartbeat >/dev/null 2>&1 || true
+fi
+
+exit 0

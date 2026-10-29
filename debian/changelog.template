@@ -1,0 +1,5 @@
+kuma-heartbeat (__VERSION__) unstable; urgency=medium
+
+  * Packaging for kuma-heartbeat __UPSTREAM_TAG__ (__ARCH__).
+
+ -- Fernando Silveira <fsilveira@gmail.com>  __DATE__

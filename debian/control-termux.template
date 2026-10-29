@@ -1,0 +1,13 @@
+Package: kuma-heartbeat
+Version: __VERSION__
+Section: net
+Priority: optional
+Architecture: __ARCH__
+Installed-Size: __INSTALLED_SIZE__
+Maintainer: Fernando Silveira <fsilveira@gmail.com>
+Homepage: https://github.com/swrh/kuma-heartbeat
+Depends: curl, termux-services
+Description: Heartbeat sender for Uptime Kuma Push monitors (Termux)
+ Sends a heartbeat to an Uptime Kuma Push monitor every minute from a
+ supervised termux-services (runit) service, so Uptime Kuma can alert when
+ this device stops reporting.

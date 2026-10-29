@@ -1,0 +1,37 @@
+[Unit]
+Description=Send a heartbeat to Uptime Kuma
+Documentation=https://github.com/swrh/kuma-heartbeat
+After=network-online.target
+Wants=network-online.target
+ConditionFileNotEmpty=/etc/kuma-heartbeat/kuma-heartbeat.conf
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+StateDirectory=kuma-heartbeat
+# The config is root:root 0600 (it holds the token); hand it to the dynamic
+# user as a credential.
+LoadCredential=conf:/etc/kuma-heartbeat/kuma-heartbeat.conf
+# Exit 2 (config incomplete) skips the run instead of failing the unit.
+ExecCondition=/usr/bin/kuma-heartbeat --check-config --config %d/conf
+ExecStart=/usr/bin/kuma-heartbeat --tick --config %d/conf
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=

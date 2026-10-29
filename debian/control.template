@@ -1,0 +1,12 @@
+Package: kuma-heartbeat
+Version: __VERSION__
+Section: net
+Priority: optional
+Architecture: __ARCH__
+Installed-Size: __INSTALLED_SIZE__
+Maintainer: Fernando Silveira <fsilveira@gmail.com>
+Homepage: https://github.com/swrh/kuma-heartbeat
+Depends: curl
+Description: Heartbeat sender for Uptime Kuma Push monitors
+ Sends a heartbeat to an Uptime Kuma Push monitor every minute (systemd
+ timer), so Uptime Kuma can alert when this host stops reporting.

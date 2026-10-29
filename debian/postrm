@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+if [ -d /run/systemd/system ] && { [ "$1" = remove ] || [ "$1" = purge ]; }; then
+  systemctl daemon-reload || true
+fi
+
+if [ "$1" = purge ]; then
+  if command -v deb-systemd-helper >/dev/null 2>&1; then
+    deb-systemd-helper purge kuma-heartbeat.timer >/dev/null || true
+    deb-systemd-helper unmask kuma-heartbeat.timer >/dev/null || true
+  fi
+  rm -rf /etc/kuma-heartbeat /var/lib/kuma-heartbeat /var/lib/private/kuma-heartbeat
+fi
+
+exit 0

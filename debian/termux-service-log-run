@@ -1,0 +1,4 @@
+#!/data/data/com.termux/files/usr/bin/sh
+logdir=/data/data/com.termux/files/usr/var/log/sv/kuma-heartbeat
+mkdir -p "$logdir"
+exec svlogd -tt "$logdir"

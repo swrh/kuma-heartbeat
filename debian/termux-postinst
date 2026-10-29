@@ -1,0 +1,8 @@
+#!/data/data/com.termux/files/usr/bin/sh
+set -e
+
+if [ "$1" = configure ] && [ -z "$2" ]; then
+  echo "kuma-heartbeat: edit \$PREFIX/etc/kuma-heartbeat/kuma-heartbeat.conf, then run: sv-enable kuma-heartbeat" >&2
+fi
+
+exit 0

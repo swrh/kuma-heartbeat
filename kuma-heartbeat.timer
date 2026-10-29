@@ -1,0 +1,12 @@
+[Unit]
+Description=Send a heartbeat to Uptime Kuma every minute
+Documentation=https://github.com/swrh/kuma-heartbeat
+
+[Timer]
+OnCalendar=minutely
+RandomizedDelaySec=10
+AccuracySec=1s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
