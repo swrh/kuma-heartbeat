@@ -1,0 +1,15 @@
+# kuma-heartbeat configuration (shell syntax, sourced by /bin/sh).
+# Keep this file readable only by its owner: it contains the push token.
+
+# Base URL of your Uptime Kuma instance (required).
+KUMA_HOST=""
+
+# Push token of the monitor: the last part of the Push URL shown by Uptime
+# Kuma, https://<host>/api/push/<TOKEN>?status=up&msg=OK&ping= (required).
+KUMA_TOKEN=""
+
+# Optional settings, shown with their defaults.
+#KUMA_STATUS="up"      # "up" or "down"
+#KUMA_MSG="OK"         # message shown in Uptime Kuma
+#KUMA_TIMEOUT="10"     # per-request timeout in seconds
+#KUMA_INTERVAL="60"    # seconds between heartbeats, minimum 10
