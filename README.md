@@ -54,11 +54,11 @@ sends immediately.
 ## Debian / Ubuntu
 
 ```sh
-curl -LO https://github.com/swrh/kuma-heartbeat/releases/latest/download/kuma-heartbeat_<version>_amd64.deb
-sudo apt install ./kuma-heartbeat_<version>_amd64.deb
+curl -LO https://github.com/swrh/kuma-heartbeat/releases/latest/download/kuma-heartbeat_<version>_all.deb
+sudo apt install ./kuma-heartbeat_<version>_all.deb
 ```
 
-Use `arm64` on ARM and the full version (e.g. `0.1.0-1`) for `<version>`. Then:
+Use the full version (e.g. `0.1.2-1`) for `<version>`. Then:
 
 ```sh
 sudoedit /etc/kuma-heartbeat/kuma-heartbeat.conf      # set KUMA_HOST and KUMA_TOKEN
@@ -79,8 +79,8 @@ Debian 12+, Ubuntu 22.04+; the script finds it via `$CREDENTIALS_DIRECTORY`). `a
 
 ```sh
 pkg install termux-services curl
-curl -LO https://github.com/swrh/kuma-heartbeat/releases/latest/download/kuma-heartbeat-termux_<version>_aarch64.deb
-apt install ./kuma-heartbeat-termux_<version>_aarch64.deb      # x86_64 on x86 devices/emulators
+curl -LO https://github.com/swrh/kuma-heartbeat/releases/latest/download/kuma-heartbeat-termux_<version>_all.deb
+apt install ./kuma-heartbeat-termux_<version>_all.deb
 nano $PREFIX/etc/kuma-heartbeat/kuma-heartbeat.conf            # set KUMA_HOST and KUMA_TOKEN
 sv-enable kuma-heartbeat
 ```
@@ -109,16 +109,16 @@ extra daemon. If you prefer cron, `pkg install cronie`, run `crond`, skip
 `sv-enable`, and add `* * * * * kuma-heartbeat` to `crontab -e`. `cronie` is
 not a hard dependency for that reason.
 
-## Architectures and file names
+## File names
 
 | Release file | Platform |
 | --- | --- |
-| `kuma-heartbeat_<ver>_amd64.deb`, `_arm64.deb` | Debian/Ubuntu |
-| `kuma-heartbeat-termux_<ver>_x86_64.deb`, `_aarch64.deb` | Termux (its dpkg calls them `x86_64` / `aarch64`) |
+| `kuma-heartbeat_<ver>_all.deb` | Debian/Ubuntu |
+| `kuma-heartbeat-termux_<ver>_all.deb` | Termux |
 
-The script is architecture-independent. Per-arch packages are a deliberate
-choice for unambiguous downloads (and Termux 32-bit `arm`/`i686` is not
-published). Inside Termux the package is still named `kuma-heartbeat`.
+The payload is a shell script, so both packages are `Architecture: all` and
+install on any CPU (including 32-bit Termux). Inside Termux the package is
+still named `kuma-heartbeat`.
 
 ## Versioning and release
 
@@ -134,7 +134,7 @@ a version with a new revision.
 
 ## Development
 
-- `scripts/build-deb.sh <version> <arch> [revision] [debian|termux]` – needs
+- `scripts/build-deb.sh <version> [revision] [debian|termux]` – needs
   only Docker (runs `dpkg-deb` in `debian:13`).
 - `scripts/test-deb.sh <deb> <version>` – run as root in a Debian/Ubuntu
   container with the repo mounted; includes functional tests against
@@ -149,7 +149,7 @@ a version with a new revision.
 | --- | --- |
 | Debian 12/13, Ubuntu 24.04, arm64 and amd64 | locally (amd64 emulated) and in CI (native runners) |
 | Ubuntu 22.04/26.04 | CI only |
-| Termux (`termux-docker`) aarch64 and x86_64, including a real runit service | locally and in CI |
+| Termux (`termux-docker`) aarch64 and x86_64 (the 32-bit ones are untested), including a real runit service | locally and in CI |
 | Real systemd: timer firing, `DynamicUser`/`LoadCredential` | **not tested** (containers run without systemd as PID 1); units are checked with `systemd-analyze verify` only |
 | Real Android device, Termux:Boot, battery optimisation | **not tested** |
 

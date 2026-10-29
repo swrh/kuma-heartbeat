@@ -1,57 +1,39 @@
 #!/usr/bin/env bash
 # Build a .deb package for kuma-heartbeat.
 #
-# Usage: build-deb.sh <version> <arch> [package_revision] [target]
+# Usage: build-deb.sh <version> [package_revision] [target]
 #   <version>           upstream tag, e.g. v0.1.0
-#   <arch>              amd64 | arm64
 #   [package_revision]  our packaging revision for this upstream version
 #                        (Debian "debian_revision" convention). Defaults to 1.
 #   [target]            debian (default) | termux
 #
 # Output (in dist/):
-#   debian: kuma-heartbeat_<ver>_<amd64|arm64>.deb
-#   termux: kuma-heartbeat-termux_<ver>_<x86_64|aarch64>.deb
-#           (Termux's dpkg names architectures x86_64 / aarch64; the package
-#           itself is still called kuma-heartbeat inside)
+#   debian: kuma-heartbeat_<ver>_all.deb
+#   termux: kuma-heartbeat-termux_<ver>_all.deb
+#           (the package itself is still called kuma-heartbeat inside)
+# Both are architecture-independent: the payload is a shell script.
 
 set -euo pipefail
 
-if [[ $# -lt 2 || $# -gt 4 ]]; then
-  echo "Usage: $0 <version> <arch> [package_revision] [target]" >&2
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+  echo "Usage: $0 <version> [package_revision] [target]" >&2
   exit 1
 fi
 
 version="$1"
-arch="$2"
-package_revision="${3:-1}"
-target="${4:-debian}"
+package_revision="${2:-1}"
+target="${3:-debian}"
+deb_arch=all
 
 # Image used only to run dpkg-deb so package building is reproducible
 # regardless of host OS (this script is expected to work from macOS too).
 build_image="${BUILD_IMAGE:-debian:13}"
 
 case "$target" in
-  debian)
-    deb_arch="$arch"
-    file_prefix="kuma-heartbeat"
-    ;;
-  termux)
-    file_prefix="kuma-heartbeat-termux"
-    case "$arch" in
-      amd64) deb_arch=x86_64 ;;
-      arm64) deb_arch=aarch64 ;;
-    esac
-    ;;
+  debian) file_prefix="kuma-heartbeat" ;;
+  termux) file_prefix="kuma-heartbeat-termux" ;;
   *)
     echo "Unsupported target: $target (expected debian or termux)" >&2
-    exit 1
-    ;;
-esac
-
-case "$arch" in
-  amd64|arm64) ;;
-  *)
-    echo "Unsupported arch: $arch (expected amd64 or arm64)" >&2
     exit 1
     ;;
 esac

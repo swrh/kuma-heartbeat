@@ -90,17 +90,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
         target: [debian, termux]
     steps:
       - uses: actions/checkout@v7
 
       - name: Build .deb
-        run: scripts/build-deb.sh "${{ needs.determine-version.outputs.version }}" "${{ matrix.arch }}" "${{ needs.determine-version.outputs.package_revision }}" "${{ matrix.target }}"
+        run: scripts/build-deb.sh "${{ needs.determine-version.outputs.version }}" "${{ needs.determine-version.outputs.package_revision }}" "${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: kuma-heartbeat-deb-${{ matrix.target }}-${{ matrix.arch }}
+          name: kuma-heartbeat-deb-${{ matrix.target }}
           path: dist/*.deb
 
   test-debian:
@@ -121,7 +120,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: kuma-heartbeat-deb-debian-${{ matrix.arch }}
+          name: kuma-heartbeat-deb-debian
           path: dist
 
       - name: Install, smoke-test, and uninstall inside ${{ matrix.image }}
@@ -133,7 +132,7 @@ jobs:
           deb_version="${version_number}-${PACKAGE_REVISION}"
           docker run --rm --platform "linux/${{ matrix.arch }}" \
             -v "$PWD:/w" -w /w "${{ matrix.image }}" \
-            ./scripts/test-deb.sh "./dist/kuma-heartbeat_${deb_version}_${{ matrix.arch }}.deb" "$version_number"
+            ./scripts/test-deb.sh "./dist/kuma-heartbeat_${deb_version}_all.deb" "$version_number"
 
   test-termux:
     needs: [determine-version, build]
@@ -147,7 +146,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: kuma-heartbeat-deb-termux-${{ matrix.arch }}
+          name: kuma-heartbeat-deb-termux
           path: dist
 
       - name: Install, smoke-test, and uninstall inside termux-docker
@@ -163,7 +162,7 @@ jobs:
           esac
           docker run --rm --platform "linux/${{ matrix.arch }}" \
             -v "$PWD:/w" -w /w "termux/termux-docker:${termux_arch}" \
-            bash ./scripts/test-termux.sh "./dist/kuma-heartbeat-termux_${deb_version}_${termux_arch}.deb" "$version_number"
+            bash ./scripts/test-termux.sh "./dist/kuma-heartbeat-termux_${deb_version}_all.deb" "$version_number"
 
   release:
     needs: [determine-version, build, test-debian, test-termux]

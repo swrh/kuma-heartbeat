@@ -31,9 +31,8 @@ fail() {
 [[ -f "$deb_path" ]] || fail "deb file not found: $deb_path"
 
 echo "==> Inspecting package contents"
-arch="$(dpkg --print-architecture)"
-[[ "$(dpkg-deb -f "$deb_path" Architecture)" == "$arch" ]] \
-  || fail "package architecture $(dpkg-deb -f "$deb_path" Architecture) != $arch"
+[[ "$(dpkg-deb -f "$deb_path" Architecture)" == all ]] \
+  || fail "package architecture $(dpkg-deb -f "$deb_path" Architecture) != all"
 paths="$(dpkg-deb -c "$deb_path" | awk '{print $6}' | grep -v '^\./$')"
 bad="$(echo "$paths" | grep -vE '^\./data/data/com\.termux/files/usr(/|$)|^\./data(/|/data|/data/com\.termux|/data/com\.termux/files)/?$' || true)"
 [[ -z "$bad" ]] || fail "paths outside the Termux prefix: $bad"
