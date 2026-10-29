@@ -47,7 +47,16 @@ Exit codes: 0 ok, 1 push failed, 2 configuration problem.
 USAGE
 }
 
-err() { printf 'kuma-heartbeat: %s\n' "$*" >&2; }
+nl='
+'
+# While BUFFERING is set (loop mode) messages are kept in BUF instead of
+# printed, so run_loop can drop repeats without using temporary files.
+info() {
+  if [ -n "$BUFFERING" ]; then BUF="${BUF}kuma-heartbeat: $*$nl"; else printf 'kuma-heartbeat: %s\n' "$*"; fi
+}
+err() {
+  if [ -n "$BUFFERING" ]; then BUF="${BUF}kuma-heartbeat: $*$nl"; else printf 'kuma-heartbeat: %s\n' "$*" >&2; fi
+}
 
 is_uint() {
   case $1 in
@@ -117,13 +126,18 @@ push() {
     url="$url&ping=$LAST_PING"
   fi
   # The URL goes through stdin so the token never shows up in "ps".
-  if secs=$(printf 'url = "%s"\n' "$url" |
-    curl -K - -fsS -m "$KUMA_TIMEOUT" --retry 2 -o /dev/null -w '%{time_total}' 2>"$TMPD/curl.err"); then
+  # stdout carries the timing (marked), stderr the error text; both are
+  # captured in memory.
+  out=$(printf 'url = "%s"\n' "$url" |
+    curl -K - -fsS -m "$KUMA_TIMEOUT" --retry 2 -o /dev/null -w '\nKUMA_TIME=%{time_total}\n' 2>&1)
+  rc=$?
+  secs=$(printf '%s\n' "$out" | sed -n 's/^KUMA_TIME=//p' | tail -n 1)
+  if [ "$rc" -eq 0 ] && [ -n "$secs" ]; then
     LAST_PING=$(printf '%s' "$secs" | awk '{ printf "%d", $1 * 1000 + 0.5 }')
-    echo "kuma-heartbeat: push ok (status=$KUMA_STATUS, round trip ${LAST_PING} ms)"
+    info "push ok (status=$KUMA_STATUS, round trip ${LAST_PING} ms)"
     return 0
   fi
-  err "push to $KUMA_HOST failed: $(sed "s/$KUMA_TOKEN/***/g" "$TMPD/curl.err" | tr '\n' ' ')"
+  err "push to $KUMA_HOST failed: $(printf '%s\n' "$out" | sed -e '/^KUMA_TIME=/d' -e '/^$/d' -e "s/$KUMA_TOKEN/***/g" | tr '\n' ' ')"
   return 1
 }
 
@@ -154,13 +168,15 @@ run_tick() {
 run_loop() {
   last_rc=-1 sleeper=""
   trap '[ -n "$sleeper" ] && kill "$sleeper" 2>/dev/null; exit 0' TERM INT
-  echo "kuma-heartbeat: $VERSION started, config $conf"
+  info "$VERSION started, config $conf"
   while :; do
-    run_once >"$TMPD/loop.out" 2>&1
+    BUFFERING=1 BUF=""
+    run_once
     rc=$?
+    BUFFERING=""
     # Only report state changes, so an outage does not flood the log.
     if [ "$rc" != "$last_rc" ]; then
-      cat "$TMPD/loop.out"
+      if [ "$rc" -eq 0 ]; then printf '%s' "$BUF"; else printf '%s' "$BUF" >&2; fi
     fi
     last_rc=$rc
     interval=$KUMA_INTERVAL
@@ -191,8 +207,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-TMPD=$(mktemp -d) || { err "cannot create a temporary directory"; exit 2; }
-trap 'rm -rf "$TMPD"' EXIT
+BUFFERING="" BUF=""
 LAST_PING=""
 
 case $mode in
