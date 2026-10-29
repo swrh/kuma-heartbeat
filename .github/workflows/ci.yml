@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  VERSION: v0.0.0-ci
+  PACKAGE_REVISION: '1'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: shellcheck
+        run: |
+          shellcheck -s sh kuma-heartbeat.sh debian/postinst debian/prerm debian/postrm debian/termux-*
+          shellcheck scripts/*.sh
+
+      - name: yamllint
+        run: |
+          pipx run yamllint .
+
+  build:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        target: [debian, termux]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build .deb
+        run: scripts/build-deb.sh "$VERSION" "${{ matrix.arch }}" "$PACKAGE_REVISION" "${{ matrix.target }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kuma-heartbeat-deb-${{ matrix.target }}-${{ matrix.arch }}
+          path: dist/*.deb
+
+  test-debian:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - ubuntu:26.04
+          - debian:12
+          - debian:13
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: kuma-heartbeat-deb-debian-${{ matrix.arch }}
+          path: dist
+
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Install, smoke-test, and uninstall inside ${{ matrix.image }}
+        run: |
+          version_number="${VERSION#v}"
+          deb_version="${version_number}-${PACKAGE_REVISION}"
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -v "$PWD:/w" -w /w "${{ matrix.image }}" \
+            ./scripts/test-deb.sh "./dist/kuma-heartbeat_${deb_version}_${{ matrix.arch }}.deb" "$version_number"
+
+  test-termux:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: kuma-heartbeat-deb-termux-${{ matrix.arch }}
+          path: dist
+
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Install, smoke-test, and uninstall inside termux-docker
+        run: |
+          version_number="${VERSION#v}"
+          deb_version="${version_number}-${PACKAGE_REVISION}"
+          case "${{ matrix.arch }}" in
+            amd64) termux_arch=x86_64 ;;
+            arm64) termux_arch=aarch64 ;;
+          esac
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -v "$PWD:/w" -w /w "termux/termux-docker:${termux_arch}" \
+            bash ./scripts/test-termux.sh "./dist/kuma-heartbeat-termux_${deb_version}_${termux_arch}.deb" "$version_number"

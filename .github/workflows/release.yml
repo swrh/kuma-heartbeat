@@ -1,0 +1,199 @@
+name: Build and release kuma-heartbeat .deb packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'kuma-heartbeat tag to build (e.g. v0.1.0). Leave empty to use the latest git tag.'
+        required: false
+      package_revision:
+        description: 'Package revision to publish (Debian "debian_revision" convention). Leave empty to auto-pick the next revision. Set this to re-publish a version after a packaging-only fix.'
+        required: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_exists: ${{ steps.check.outputs.exists }}
+      package_revision: ${{ steps.revision.outputs.revision }}
+      release_tag: ${{ steps.revision.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine target version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            tag="$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")"
+            echo "version=$tag" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check whether this version already has a release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release list --repo "${{ github.repository }}" --limit 500 --json tagName \
+               --jq '.[].tagName' 2>/dev/null \
+               | grep -qE "^${VERSION//./\\.}(-[0-9]+)?\$"; then
+            echo "release already exists"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine package revision
+        id: revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          INPUT_REVISION: ${{ github.event.inputs.package_revision }}
+        run: |
+          if [ -n "$INPUT_REVISION" ]; then
+            revision="$INPUT_REVISION"
+          else
+            max=0
+            while IFS= read -r tag; do
+              [ -z "$tag" ] && continue
+              if [ "$tag" = "$VERSION" ]; then
+                rev=1
+              elif [[ "$tag" =~ ^${VERSION//./\\.}-([0-9]+)$ ]]; then
+                rev="${BASH_REMATCH[1]}"
+              else
+                continue
+              fi
+              if [ "$rev" -gt "$max" ]; then
+                max="$rev"
+              fi
+            done < <(gh release list --repo "${{ github.repository }}" --limit 500 --json tagName --jq '.[].tagName' 2>/dev/null || true)
+            revision=$((max + 1))
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "tag=${VERSION}-${revision}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        target: [debian, termux]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build .deb
+        run: scripts/build-deb.sh "${{ needs.determine-version.outputs.version }}" "${{ matrix.arch }}" "${{ needs.determine-version.outputs.package_revision }}" "${{ matrix.target }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kuma-heartbeat-deb-${{ matrix.target }}-${{ matrix.arch }}
+          path: dist/*.deb
+
+  test-debian:
+    needs: [determine-version, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - ubuntu:26.04
+          - debian:12
+          - debian:13
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: kuma-heartbeat-deb-debian-${{ matrix.arch }}
+          path: dist
+
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Install, smoke-test, and uninstall inside ${{ matrix.image }}
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          PACKAGE_REVISION: ${{ needs.determine-version.outputs.package_revision }}
+        run: |
+          version_number="${VERSION#v}"
+          deb_version="${version_number}-${PACKAGE_REVISION}"
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -v "$PWD:/w" -w /w "${{ matrix.image }}" \
+            ./scripts/test-deb.sh "./dist/kuma-heartbeat_${deb_version}_${{ matrix.arch }}.deb" "$version_number"
+
+  test-termux:
+    needs: [determine-version, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: kuma-heartbeat-deb-termux-${{ matrix.arch }}
+          path: dist
+
+      - uses: docker/setup-qemu-action@v4
+
+      - name: Install, smoke-test, and uninstall inside termux-docker
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          PACKAGE_REVISION: ${{ needs.determine-version.outputs.package_revision }}
+        run: |
+          version_number="${VERSION#v}"
+          deb_version="${version_number}-${PACKAGE_REVISION}"
+          case "${{ matrix.arch }}" in
+            amd64) termux_arch=x86_64 ;;
+            arm64) termux_arch=aarch64 ;;
+          esac
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -v "$PWD:/w" -w /w "termux/termux-docker:${termux_arch}" \
+            bash ./scripts/test-termux.sh "./dist/kuma-heartbeat-termux_${deb_version}_${termux_arch}.deb" "$version_number"
+
+  release:
+    needs: [determine-version, build, test-debian, test-termux]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: kuma-heartbeat-deb-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          PACKAGE_REVISION: ${{ needs.determine-version.outputs.package_revision }}
+          RELEASE_TAG: ${{ needs.determine-version.outputs.release_tag }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/*.deb \
+            --title "kuma-heartbeat $VERSION (.deb packages, packaging r$PACKAGE_REVISION)" \
+            --notes "Release of kuma-heartbeat $VERSION as .deb packages for Ubuntu/Debian (kuma-heartbeat_*) and Termux (kuma-heartbeat-termux_*).
+
+          Package revision: $PACKAGE_REVISION
+
+          Repository: https://github.com/swrh/kuma-heartbeat"
