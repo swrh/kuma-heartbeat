@@ -73,7 +73,7 @@ incomplete. Check it with `systemctl list-timers kuma-heartbeat.timer` and
 
 The service runs as a systemd `DynamicUser` with a locked-down sandbox; the
 root-only config is handed over with `LoadCredential=` (needs systemd ≥ 247:
-Debian 12+, Ubuntu 22.04+). `apt remove` keeps the config, `apt purge` deletes it.
+Debian 12+, Ubuntu 22.04+; the script finds it via `$CREDENTIALS_DIRECTORY`). `apt remove` keeps the config, `apt purge` deletes it.
 
 ## Termux (Android)
 

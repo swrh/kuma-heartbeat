@@ -141,6 +141,14 @@ kuma-heartbeat >/tmp/out 2>&1 || fail "manual run failed"
 [[ "$(requests)" == 2 ]] || fail "manual run should always push (got $(requests))"
 unset KUMA_HEARTBEAT_STATE
 
+# 6b. Under systemd the config comes from $CREDENTIALS_DIRECTORY/conf.
+mkdir -p /tmp/creds
+printf 'KUMA_HOST="http://127.0.0.1:%s"\nKUMA_TOKEN="%s"\n' "$port" "$token" > /tmp/creds/conf
+write_conf "" ""
+: > "$reqlog"
+CREDENTIALS_DIRECTORY=/tmp/creds kuma-heartbeat >/tmp/out 2>&1 || { cat /tmp/out; fail "run via CREDENTIALS_DIRECTORY failed"; }
+[[ "$(requests)" == 1 ]] || fail "CREDENTIALS_DIRECTORY config was not used"
+
 # 7. --loop pushes at the configured interval and stops on SIGTERM.
 write_conf "http://127.0.0.1:$port" "$token" 'KUMA_INTERVAL=10'
 : > "$reqlog"

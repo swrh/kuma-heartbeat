@@ -13,8 +13,8 @@ StateDirectory=kuma-heartbeat
 # user as a credential.
 LoadCredential=conf:/etc/kuma-heartbeat/kuma-heartbeat.conf
 # Exit 2 (config incomplete) skips the run instead of failing the unit.
-ExecCondition=/usr/bin/kuma-heartbeat --check-config --config %d/conf
-ExecStart=/usr/bin/kuma-heartbeat --tick --config %d/conf
+ExecCondition=/usr/bin/kuma-heartbeat --check-config
+ExecStart=/usr/bin/kuma-heartbeat --tick
 
 NoNewPrivileges=yes
 ProtectSystem=strict

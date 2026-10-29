@@ -10,6 +10,11 @@ VERSION="__VERSION__"
 case $VERSION in __*) VERSION=dev ;; esac
 
 conf="${KUMA_HEARTBEAT_CONF:-$PKG_PREFIX/etc/kuma-heartbeat/kuma-heartbeat.conf}"
+# Under the systemd service the root-only config arrives as a credential
+# (the %d unit specifier would need systemd >= 250; Ubuntu 22.04 has 249).
+if [ -z "${KUMA_HEARTBEAT_CONF:-}" ] && [ -r "${CREDENTIALS_DIRECTORY:-}/conf" ]; then
+  conf="$CREDENTIALS_DIRECTORY/conf"
+fi
 state_dir="${KUMA_HEARTBEAT_STATE:-${STATE_DIRECTORY:-}}"
 
 usage() {
